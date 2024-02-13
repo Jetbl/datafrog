@@ -1,8 +1,7 @@
 use std::iter::FromIterator;
 
 use crate::{
-    join,
-    merge,
+    join, merge,
     treefrog::{self, Leapers},
 };
 
@@ -24,6 +23,22 @@ impl<Tuple: Ord> Relation<Tuple> {
         Relation { elements }
     }
 
+    /// Merges two relations into their lattice.
+    pub fn merge_lattice<K: Ord, F1, F2>(&mut self, key: F1, tuple: F2)
+    where
+        F1: Fn(&Tuple) -> K + 'static,
+        F2: Fn(&Tuple, &Tuple) -> Tuple + 'static,
+    {
+        self.elements.dedup_by(|t2, t1| {
+            if key(t1) == key(t2) {
+                *t1 = tuple(t1, t2);
+                true
+            } else {
+                false
+            }
+        });
+    }
+
     /// Creates a `Relation` from the elements of the `iterator`.
     ///
     /// Same as the `from_iter` method from `std::iter::FromIterator` trait.
@@ -42,6 +57,16 @@ impl<Tuple: Ord> Relation<Tuple> {
         logic: impl FnMut(&SourceTuple, &Val) -> Tuple,
     ) -> Self {
         treefrog::leapjoin(&source.elements, leapers, logic)
+    }
+
+    /// Creates a `Relation` using the `leapjoin` logic;
+    /// see [`Variable::from_leapjoin_filter`](crate::Variable::from_leapjoin_filter)
+    pub fn from_leapjoin_filter<'leap, SourceTuple: Ord, Val: Ord + 'leap>(
+        source: &Relation<SourceTuple>,
+        leapers: impl Leapers<'leap, SourceTuple, Val>,
+        logic: impl FnMut(&SourceTuple, &Val) -> Option<Tuple>,
+    ) -> Self {
+        treefrog::leapjoin_filter(&source.elements, leapers, logic)
     }
 
     /// Creates a `Relation` by joining the values from `input1` and `input2` and then applying

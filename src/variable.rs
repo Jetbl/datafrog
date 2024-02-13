@@ -269,6 +269,47 @@ impl<Tuple: Ord> Variable<Tuple> {
     ) {
         self.insert(treefrog::leapjoin(&source.recent.borrow(), leapers, logic));
     }
+
+    /// Adds tuples that result from combining `source` with the
+    /// relations given in `leapers`. This operation is very flexible
+    /// and can be used to do a combination of joins and anti-joins.
+    /// The main limitation is that the things being combined must
+    /// consist of one dynamic variable (`source`) and then several
+    /// fixed relations (`leapers`).
+    ///
+    /// The idea is as follows:
+    ///
+    /// - You will be inserting new tuples that result from joining (and anti-joining)
+    ///   some dynamic variable `source` of source tuples (`SourceTuple`)
+    ///   with some set of values (of type `Val`).
+    /// - You provide these values by combining `source` with a set of leapers
+    ///   `leapers`, each of which is derived from a fixed relation. The `leapers`
+    ///   should be either a single leaper (of suitable type) or else a tuple of leapers.
+    ///   You can create a leaper in one of two ways:
+    ///   - Extension: In this case, you have a relation of type `(K, Val)` for some
+    ///     type `K`. You provide a closure that maps from `SourceTuple` to the key
+    ///     `K`. If you use `relation.extend_with`, then any `Val` values the
+    ///     relation provides will be added to the set of values; if you use
+    ///     `extend_anti`, then the `Val` values will be removed.
+    ///   - Filtering: In this case, you have a relation of type `K` for some
+    ///     type `K` and you provide a closure that maps from `SourceTuple` to
+    ///     the key `K`. Filters don't provide values but they remove source
+    ///     tuples.
+    /// - Finally, you get a callback `logic` that accepts each `(SourceTuple, Val)`
+    ///   that was successfully joined (and not filtered) and which maps to the
+    ///   type of this variable.
+    pub fn from_leapjoin_filter<'leap, SourceTuple: Ord, Val: Ord + 'leap>(
+        &self,
+        source: &Variable<SourceTuple>,
+        leapers: impl Leapers<'leap, SourceTuple, Val>,
+        logic: impl FnMut(&SourceTuple, &Val) -> Option<Tuple>,
+    ) {
+        self.insert(treefrog::leapjoin_filter(
+            &source.recent.borrow(),
+            leapers,
+            logic,
+        ));
+    }
 }
 
 impl<Tuple> Clone for Variable<Tuple> {
